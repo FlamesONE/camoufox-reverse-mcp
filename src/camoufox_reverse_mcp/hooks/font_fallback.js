@@ -20,7 +20,24 @@
     "@font-face{font-family:'Noto Sans CJK SC';src:local('Noto Sans CJK SC'),local('PingFang SC'),local('Microsoft YaHei'),local('WenQuanYi Micro Hei')}",
     "@font-face{font-family:'WenQuanYi Micro Hei';src:local('WenQuanYi Micro Hei'),local('PingFang SC'),local('Microsoft YaHei'),local('Noto Sans CJK SC')}"
   ].join("\n");
-  var style = document.createElement("style");
-  style.textContent = css;
-  (document.head || document.documentElement).appendChild(style);
+  function inject() {
+    try {
+      var root = document.head || document.documentElement;
+      if (!root) return false;
+      var style = document.createElement("style");
+      style.textContent = css;
+      root.appendChild(style);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  // add_init_script runs at document-start, before <head>/<html> may exist.
+  // Never throw here (an uncaught error at document-start breaks the page's
+  // own bootstrap). Defer to DOMContentLoaded if the DOM isn't ready yet.
+  if (!inject()) {
+    try {
+      document.addEventListener("DOMContentLoaded", inject, { once: true });
+    } catch (e) {}
+  }
 })();

@@ -172,6 +172,8 @@ class BrowserManager:
         for script_info in self._persistent_scripts:
             await ctx.add_init_script(script=script_info["content"])
 
+        self._attach_context_listeners(ctx)
+
         page = ctx.pages[0] if ctx.pages else await ctx.new_page()
         self._attach_listeners(page)
         self.pages["default"] = page
@@ -228,6 +230,7 @@ class BrowserManager:
         try:
             ctx = self.browser.contexts[0] if self.browser.contexts else await self.browser.new_context()
             self.contexts["default"] = ctx
+            self._attach_context_listeners(ctx)
 
             for script_info in self._persistent_scripts:
                 await ctx.add_init_script(script=script_info["content"])
@@ -282,11 +285,30 @@ class BrowserManager:
         self._persistent_scripts = [s for s in self._persistent_scripts if s["name"] != name]
         return len(self._persistent_scripts) < before
 
+    def _attach_context_listeners(self, ctx) -> None:
+        """Attach network capture at the BROWSER CONTEXT level.
+
+        Page-level request/response events in Firefox only fire reliably for the
+        first document load; once an SPA (e.g. Twitch) boots and drives traffic
+        from its app/workers, page-level events go silent. Context-level events
+        capture every request across page swaps, popups, and frames.
+        """
+        if getattr(ctx, "_mcp_net_wired", False):
+            return
+        ctx.on("request", self._on_request)
+        ctx.on("response", self._on_response_async)
+        try:
+            ctx._mcp_net_wired = True
+        except Exception:
+            pass
+
     def _attach_listeners(self, page: Page) -> None:
-        """Attach console, network, and trace-collection listeners to a page."""
+        """Attach console + navigation-tracking listeners to a page.
+
+        Network capture is wired at context level (see _attach_context_listeners);
+        keeping request/response here too would double-count every request.
+        """
         page.on("console", self._on_console)
-        page.on("request", self._on_request)
-        page.on("response", self._on_response_async)
         page.on("response", self._on_response_for_nav)
 
     def _on_console(self, msg) -> None:
@@ -400,6 +422,7 @@ class BrowserManager:
         for script_info in self._persistent_scripts:
             await ctx.add_init_script(script=script_info["content"])
         self.contexts[name] = ctx
+        self._attach_context_listeners(ctx)
         page = await ctx.new_page()
         self._attach_listeners(page)
         self.pages[name] = page

@@ -315,13 +315,26 @@ class BrowserManager:
         if not fnmatch.fnmatch(req.url, self._capture_pattern):
             return
         self._request_id_counter += 1
+        post_data = None
+        post_data_b64 = None
+        try:
+            post_data = req.post_data
+        except Exception:
+            try:
+                import base64 as _b64
+                buf = req.post_data_buffer
+                if buf is not None:
+                    post_data_b64 = _b64.b64encode(buf).decode("ascii")
+            except Exception:
+                pass
         entry = {
             "id": self._request_id_counter,
             "url": req.url,
             "method": req.method,
             "resource_type": req.resource_type,
             "request_headers": dict(req.headers),
-            "request_post_data": req.post_data,
+            "request_post_data": post_data,
+            "request_post_data_b64": post_data_b64,
             "timestamp": int(time.time() * 1000),
             "status": None,
             "response_headers": None,

@@ -10,7 +10,9 @@ from typing import Any
 from playwright.async_api import Page, BrowserContext
 
 MAX_LOG_SIZE = 2000
-MAX_BODY_SIZE = 200_000
+# JS bundles (e.g. obfuscated anti-bot sensors) routinely exceed 200KB; the old
+# cap silently truncated them mid-analysis. 8MB covers any realistic script.
+MAX_BODY_SIZE = 8_000_000
 
 
 def detect_host_os() -> str:
